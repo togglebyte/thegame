@@ -29,15 +29,12 @@ impl TextField {
 
     pub fn clear(&mut self) {
         self.text.clear();
+        self.cursor = 0;
     }
 
     pub fn unfocus(&mut self) {
         self.focus = false;
         self.cursor = self.text.chars().count();
-    }
-
-    pub fn focus(&mut self) {
-        self.focus = true;
     }
 
     pub fn event(&mut self, event: Event) {

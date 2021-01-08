@@ -1,18 +1,19 @@
+use common::{Message, Tx};
 use legion::{system, Resources, Schedule};
 use tinybit::events::{Event, KeyCode, KeyEvent};
 use tinybit::widgets::{Border, Text};
-use tinybit::{term_size, ScreenPos, ScreenSize, Viewport};
-use common::{Tx, Message};
+use tinybit::{term_size, Color, ScreenPos, ScreenSize, Viewport};
 
-use crate::world::GameState;
 use crate::state::{State, Transition};
 use crate::ui::TextField;
+use crate::world::GameState;
 use crate::{NextState, Rend};
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
 pub struct SignIn;
 
 pub struct LoadingMessage(bool, Text);
+pub struct ErrorMessage(bool, Text);
 
 impl SignIn {
     pub fn schedule(resources: &mut Resources) -> Schedule {
@@ -25,15 +26,16 @@ impl SignIn {
         resources.insert(SignInViewport(viewport));
 
         // Loading message
-        let loading_message = LoadingMessage(
-            false,
-            Text::new(
-                "Loading...".to_string(),
-                None,
-                None
-            ),
-        );
+        let loading_message =
+            LoadingMessage(false, Text::new("Loading...".to_string(), None, None));
         resources.insert(loading_message);
+
+        // Error message
+        let error_message = ErrorMessage(
+            false,
+            Text::new("Invalid credentials".to_string(), Some(Color::Red), None),
+        );
+        resources.insert(error_message);
 
         // Username
         let mut username = UsernameInput(TextField::new(None));
@@ -51,7 +53,7 @@ impl SignIn {
         schedule.add_system(render_system());
         schedule.add_system(draw_input_fields_system());
         schedule.add_system(read_username_and_password_system());
-        schedule.add_system(show_loading_system());
+        schedule.add_system(next_state_system());
         schedule.build()
     }
 }
@@ -71,6 +73,7 @@ fn read_username_and_password(
     #[resource] server_tx: &mut Tx,
     #[resource] event: &mut Event,
     #[resource] loading_message: &mut LoadingMessage,
+    #[resource] error_message: &mut ErrorMessage,
     #[resource] username: &mut UsernameInput,
     #[resource] password: &mut PasswordInput,
     #[resource] next_state: &mut NextState,
@@ -88,6 +91,10 @@ fn read_username_and_password(
         }
         KeyEvent {
             code: KeyCode::Tab, ..
+        }
+        | KeyEvent {
+            code: KeyCode::BackTab,
+            ..
         } => {
             if username.0.focus {
                 username.0.unfocus();
@@ -107,6 +114,7 @@ fn read_username_and_password(
             password.0.enabled = false;
 
             loading_message.0 = true;
+            error_message.0 = false;
             let _ = server_tx.send(Message::SignInRequest(
                 username.0.text.clone(),
                 password.0.text.clone(),
@@ -120,7 +128,6 @@ fn read_username_and_password(
     } else if password.0.focus {
         password.0.event(*event);
     }
-
 }
 
 #[system]
@@ -128,6 +135,7 @@ fn draw_input_fields(
     #[resource] viewport: &mut SignInViewport,
     #[resource] username: &mut UsernameInput,
     #[resource] password: &mut PasswordInput,
+    #[resource] error_message: &mut ErrorMessage,
 ) {
     viewport.0.draw_widget(
         &Border::new("╔═╗║╝═╚║".to_string(), None, None),
@@ -141,11 +149,18 @@ fn draw_input_fields(
     let x = viewport.0.size.width / 2 - 7;
     let y = viewport.0.size.height / 2 + 1;
     viewport.0.draw_widget(&password.0, ScreenPos::new(x, y));
+
+    if error_message.0 {
+        viewport
+            .0
+            .draw_widget(&error_message.1, ScreenPos::new(x, y + 2));
+    }
 }
 
 #[system]
-fn show_loading(
+fn next_state(
     #[resource] loading: &mut LoadingMessage,
+    #[resource] error_message: &mut ErrorMessage,
     #[resource] viewport: &mut SignInViewport,
     #[resource] message: &mut Option<Message>,
     #[resource] next_state: &mut NextState,
@@ -153,27 +168,46 @@ fn show_loading(
     #[resource] password: &mut PasswordInput,
 ) {
     if loading.0 {
+        // Show loading message
         viewport.0.draw_widget(&loading.1, ScreenPos::new(2, 2));
     }
 
     let hello = match message {
-        Some(Message::Hello(data)) => *data,
+        Some(Message::SignInSuccess(data)) => *data,
         _ => return,
     };
 
-    username.0.focus();
+    // Hide loading message
+    if loading.0 {
+        loading.0 = false;
+    }
+
+    // Re-enable the input fields
+    username.0.focus = false;
+    username.0.enabled = true;
+    password.0.enabled = true;
+    password.0.focus = true;
+    password.0.clear();
 
     // Clear the message
     message.take();
 
     match hello {
-        0 => *next_state = Some(Transition::Swap(State::SignIn(SignIn))),
-        1 => *next_state = Some(Transition::Swap(State::Game(GameState))),
-        _ => unreachable!(),
+        true => *next_state = Some(Transition::Swap(State::Game(GameState))),
+        false => error_message.0 = true,
     }
 }
 
 #[system]
-fn render(#[resource] viewport: &mut SignInViewport, #[resource] renderer: &mut Rend) {
+fn render(
+    #[resource] viewport: &mut SignInViewport,
+    #[resource] renderer: &mut Rend,
+    #[resource] event: &Event,
+) {
+    if let Event::Resize(width, height) = event {
+        renderer.clear();
+        viewport.0.resize(*width, *height);
+    }
+
     renderer.render(&mut viewport.0);
 }

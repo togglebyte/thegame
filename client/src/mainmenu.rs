@@ -141,6 +141,14 @@ fn draw_menu(
 }
 
 #[system]
-fn render_main_menu(#[resource] viewport: &mut MainMenuViewport, #[resource] renderer: &mut Rend) {
+fn render_main_menu(
+    #[resource] viewport: &mut MainMenuViewport,
+    #[resource] renderer: &mut Rend,
+    #[resource] event: &Event,
+) {
+    if let Event::Resize(width, height) = event {
+        renderer.clear();
+        viewport.0.resize(*width, *height);
+    }
     renderer.render(&mut viewport.0);
 }

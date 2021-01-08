@@ -33,17 +33,16 @@ impl<T: AsRawFd + Read + Write> Reactor for SignIn<T> {
     fn react(&mut self, reaction: Reaction<Self::Input>) -> Reaction<Self::Output> {
         match reaction {
             Reaction::Event(ev) if self.0.contains_key(&ev.owner) => {
-                let mut data = self.0.recv(ev.owner);
-                if let Some(mut data) = data.first_mut() {
-                    let message = Message::from_bytes(&data);
-                    if let Message::SignInRequest(username, password) = message {
-                        if authenticate(&username, &password) {
-                            self.0.send(ev.owner, Message::Hello(1).to_bytes());
-                        } else {
-                            self.0.send(ev.owner, Message::Hello(0).to_bytes());
-                        }
+                match self.0.recv(ev.owner).first_mut().map(|buf| Message::from_bytes(&buf)) {
+                    Some(Message::SignInRequest(u, p)) => {
+                        self.0.send(
+                            ev.owner,
+                            Message::SignInSuccess(authenticate(&u, &p)).to_bytes(),
+                        );
                     }
+                    _ => {}
                 }
+
                 Reaction::Continue
             }
 

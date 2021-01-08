@@ -23,7 +23,7 @@ pub struct SaveState {
 pub enum Message {
     SignInRequest(String, String),
     SignInResponse(SaveState),
-    Hello(u32),
+    SignInSuccess(bool),
 }
 
 impl Message {
