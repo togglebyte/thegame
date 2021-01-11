@@ -1,4 +1,5 @@
-use common::{Message, Tx};
+use common::models::{Auth, Message};
+use common::Tx;
 use legion::{system, Resources, Schedule};
 use tinybit::events::{Event, KeyCode, KeyEvent};
 use tinybit::widgets::{Border, Text};
@@ -115,10 +116,10 @@ fn read_username_and_password(
 
             loading_message.0 = true;
             error_message.0 = false;
-            let _ = server_tx.send(Message::SignInRequest(
+            let _ = server_tx.send(Message::Auth(Auth::SignIn(
                 username.0.text.clone(),
                 password.0.text.clone(),
-            ));
+            )));
         }
         _ => {}
     }
@@ -172,8 +173,12 @@ fn next_state(
         viewport.0.draw_widget(&loading.1, ScreenPos::new(2, 2));
     }
 
-    let hello = match message {
-        Some(Message::SignInSuccess(data)) => *data,
+    let gamestate = match message.take() {
+        Some(Message::Auth(Auth::Success(gamestate))) => gamestate,
+        Some(Message::Auth(Auth::Failed)) => {
+            error_message.0 = true;
+            return;
+        }
         _ => return,
     };
 
@@ -192,10 +197,7 @@ fn next_state(
     // Clear the message
     message.take();
 
-    match hello {
-        true => *next_state = Some(Transition::Swap(State::Game(GameState))),
-        false => error_message.0 = true,
-    }
+    *next_state = Some(Transition::Swap(State::Game(GameState)));
 }
 
 #[system]

@@ -5,7 +5,8 @@ use std::net::TcpStream;
 use std::thread;
 use std::time::Duration;
 
-use common::{Tx, Rx, Message};
+use common::{Tx, Rx};
+use common::models::Message;
 
 pub fn connect(client_tx: Tx) -> Tx {
     let (server_tx, server_rx) = mpsc::channel::<Message>();
@@ -14,7 +15,7 @@ pub fn connect(client_tx: Tx) -> Tx {
     connection.set_nonblocking(true);
 
     let handle = thread::spawn(move || {
-        let mut buf = [0u8; 1024 * 4];
+        let mut buf = [0u8; 1024 * 8];
 
         loop {
             // -----------------------------------------------------------------------------
@@ -23,7 +24,7 @@ pub fn connect(client_tx: Tx) -> Tx {
             match connection.read(&mut buf) {
                 Ok(0) => {}
                 Ok(n) => {
-                    let message = &buf[..n - 1];
+                    let message = &buf[..n];
                     let message = Message::from_bytes(message);
                     client_tx.send(message);
                 }

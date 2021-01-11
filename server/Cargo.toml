@@ -10,3 +10,4 @@ edition = "2018"
 netlib = { path = "../../netlib" }
 libc = "0.2.81"
 common = { path = "../common" }
+tinybit = { path = "../../tinybit" }

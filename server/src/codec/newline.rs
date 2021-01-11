@@ -65,7 +65,7 @@ impl Codec for Newline {
         }
     }
 
-    fn encode<T: Write>(&mut self, src: &mut T, data: Self::Item) -> Encode {
+    fn encode<T: Write>(&mut self, src: &mut T, mut data: Self::Item) -> Encode {
         match src.write(&data).is_ok() {
             true => Encode::Success,
             false => Encode::Fail,

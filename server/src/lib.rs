@@ -8,6 +8,7 @@ use netlib::{Reactor, Result, System, Interest};
 mod accounts;
 mod codec;
 mod connections;
+mod datastore;
 
 pub type DefaultCodec = codec::newline::Newline;
 

@@ -29,7 +29,7 @@ fn make_resources() -> Resources {
     let stdout_renderer = StdoutTarget::new().expect("Failed to enter raw mode");
     let renderer = Renderer::new(stdout_renderer);
     resources.insert(renderer);
-    resources.insert::<Option<common::Message>>(None);
+    resources.insert::<Option<common::models::Message>>(None);
     resources.insert::<NextState>(None);
 
     resources
